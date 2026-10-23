@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Smiski Planner</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+body{font-family:Nunito,system-ui,sans-serif;background:#F4F3EE url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='170'%3E%3Cg fill='%232b2b2b' fill-opacity='.06'%3E%3Ccircle cx='30' cy='28' r='7'/%3E%3Crect x='24' y='34' width='12' height='11' rx='5'/%3E%3Cpath d='M106 18l2.5 6 6 2.5-6 2.5-2.5 6-2.5-6-6-2.5 6-2.5z'/%3E%3Cpath d='M62 106l2 4.5 4.5 2-4.5 2-2 4.5-2-4.5-4.5-2 4.5-2z'/%3E%3Ccircle cx='134' cy='112' r='7'/%3E%3Crect x='128' y='118' width='12' height='11' rx='5'/%3E%3Ccircle cx='120' cy='70' r='1.7'/%3E%3Ccircle cx='18' cy='94' r='1.7'/%3E%3Ccircle cx='86' cy='150' r='1.7'/%3E%3Ccircle cx='70' cy='40' r='1.4'/%3E%3C/g%3E%3C/svg%3E") fixed;color:#2b2b2b;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{outline:none}
+.font-medium{font-weight:700!important}.font-semibold{font-weight:800!important}.font-bold{font-weight:900!important}
+.card{background:#fff;border-radius:28px;box-shadow:0 5px 0 #e5e5db,0 10px 25px rgba(0,0,0,.05),inset 0 2px 0 #fff}
+.tap{transition:transform .12s}.tap:active{transform:translateY(2px)}
+.btn{background:#A8C3A0;color:#1f3a1c;border-radius:18px;font-weight:800;box-shadow:0 5px 0 #8aa883,0 10px 16px -6px rgba(60,90,50,.4);transition:.1s}
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 #8aa883}
+.inp{width:100%;background:#f4f4f0;border-radius:16px;padding:.8rem 1rem;font-weight:700;outline:none;box-shadow:inset 0 2px 5px rgba(0,0,0,.1)}
+.inp:focus{box-shadow:inset 0 2px 5px rgba(0,0,0,.1),0 0 0 2px #A8C3A0}
+.chk{width:30px;height:30px;border-radius:50%;background:#eef2ea;box-shadow:inset 0 2px 4px rgba(0,0,0,.14);flex:none;position:relative;transition:.25s}
+.chk::after{content:"";position:absolute;left:10px;top:5px;width:7px;height:14px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg) scale(0);transition:transform .2s .05s}
+.done .chk{background:#A8C3A0;box-shadow:0 3px 0 #8aa883}
+.done .chk::after{transform:rotate(45deg) scale(1)}
+.t{background:linear-gradient(currentColor,currentColor) no-repeat 0 58%/0 2px;transition:background-size .4s ease,opacity .4s ease}
+.done .t{background-size:100% 2px;opacity:.4}
+.track{background:#eef2ea;box-shadow:inset 0 2px 4px rgba(0,0,0,.12)}
+.tag{display:inline-flex;align-items:center;padding:2px 9px;border-radius:8px;font-size:12px;font-weight:800;line-height:18px;white-space:nowrap}
+.chip{padding:7px 13px;border-radius:12px;font-size:14px;font-weight:800;border:2px solid transparent;opacity:.55;transition:.15s;-webkit-appearance:none;appearance:none;outline:0!important;box-shadow:none}
+.chip:focus,.chip:focus-visible,.chip:active{outline:0!important;box-shadow:none}
+.chip.on{opacity:1;border-color:var(--c)}
+#ov{opacity:0;pointer-events:none;transition:.25s}#ov.open{opacity:1;pointer-events:auto}
+#sheet{transform:translateY(100%);transition:transform .35s cubic-bezier(.2,.9,.3,1)}#ov.open #sheet{transform:none}
+.nav button{transition:.15s;color:#6f6f68}.nav .on{background:#A8C3A0;color:#1f3a1c;box-shadow:0 3px 0 #8aa883}
+@keyframes pop{from{transform:scale(.96);opacity:0}to{transform:none;opacity:1}}.pop{animation:pop .3s ease-out}
+</style>
+</head>
+<body class="min-h-screen">
+<main id="app" class="max-w-md mx-auto px-4 pt-4 pb-40"></main>
+<button id="fab" onclick="addSheet()" class="btn !rounded-full fixed right-5 bottom-28 w-16 h-16 text-4xl leading-none z-20" aria-label="Добавить задачу">+</button>
+<nav id="nav" class="nav card fixed bottom-3 inset-x-3 max-w-md mx-auto flex p-1.5 z-20" style="margin-bottom:env(safe-area-inset-bottom)"></nav>
+<div id="ov" class="fixed inset-0 z-30 bg-black/25 flex items-end" onclick="if(event.target===this)closeSheet()">
+  <div id="sheet" class="w-full max-w-md mx-auto bg-[#fbfbf8] rounded-t-[32px] p-5 pb-8 max-h-[92vh] overflow-y-auto"><div id="sheet-in"></div></div>
+</div>
+
+<script>
+const tg=window.Telegram?.WebApp;tg?.ready?.();tg?.expand?.();tg?.setHeaderColor?.('#F4F3EE');tg?.setBackgroundColor?.('#F4F3EE');
+const $=s=>document.querySelector(s);
+const CATS={lesson:['📚 Уроки','#E7F3F8','#28456C'],submit:['📝 Сдать','#FBF3DB','#956400'],exam:['🎓 Экзамены','#F6E9F9','#6940A5'],sport:['💪 Спорт','#DDEDEA','#1C3829'],meet:['👥 Встречи','#FADEC9','#8A4B1B'],home:['🏠 Дом','#F5E0E9','#AD1A72'],other:['✨ Другое','#E9E9E7','#32302C']};
+const NAV=[['today','<path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h9"/>','Сегодня'],['plans','<rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/>','Все планы'],['lists','<path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/>','Чек-листы'],['links','<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>','Ссылки'],['stats','<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>','Итоги']];
+const ic=(p,s=20)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const TRASH=ic('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5"/>');
+const GREET=['ну что, разгребаем? само оно не сделается','нормально идём, разгребём по порядку','так, смотрим, что у нас на сегодня','давай с самого простого, дальше пойдёт','опять откладываешь? шучу... почти'];
+const G0=GREET[Math.floor(Math.random()*GREET.length)];
+let S;try{S=JSON.parse(localStorage.getItem('smiski_planner'))}catch(e){}
+S=S||{};S.tasks=S.tasks||[];S.links=S.links||[];S.lists=S.lists||[];
+const save=()=>localStorage.setItem('smiski_planner',JSON.stringify(S));
+const iso=d=>new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const T0=()=>iso(new Date());
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const img=(n,c)=>`<img src="${n}" alt="" draggable="false" class="${c} object-contain select-none drop-shadow-[0_10px_10px_rgba(0,0,0,0.12)]" onerror="this.style.display='none'">`;
+const sit=(n,sz='w-28 h-28',pos='right-4')=>img(n,`${sz} absolute ${pos} bottom-[calc(100%-12px)] pointer-events-none z-[1]`);
+const hap=()=>tg?.HapticFeedback?.impactOccurred?.('light');
+const pl=(n,f)=>f[n%10===1&&n%100!==11?0:[2,3,4].includes(n%10)&&![12,13,14].includes(n%100)?1:2];
+const streak=set=>{let n=0,d=new Date();if(!set.has(iso(d)))d.setDate(d.getDate()-1);while(set.has(iso(d))){n++;d.setDate(d.getDate()-1)}return n};
+const tag=k=>`<span class="tag" style="background:${CATS[k][1]};color:${CATS[k][2]}">${CATS[k][0]}</span>`;
+const status=(d,n)=>!n?'на сегодня пусто. подозрительно, но приятно':d===n?'все сделано. можно выдыхать, день закрыт':d===0?'ну давай, первое дело само себя не сделает':d/n<.6?'нормально идём, разгребём':'осталось чуть-чуть, дожимай';
+const byTime=(a,b)=>(a.time||'99').localeCompare(b.time||'99');
+const isDone=(t,d)=>t.rec?!!(t.log&&t.log[d]):t.done;
+const wd=d=>new Date(d+'T00:00').getDay();
+const RULE=['Каждое воскресенье','Каждый понедельник','Каждый вторник','Каждую среду','Каждый четверг','Каждую пятницу','Каждую субботу'];
+const rule=d=>RULE[wd(d)];
+const on=d=>S.tasks.filter(t=>t.rec?d>=t.date&&wd(d)===wd(t.date):t.date===d);
+const doneList=()=>S.tasks.flatMap(t=>t.rec?Object.keys(t.log||{}).map(d=>({text:t.text,cat:t.cat,d})):t.done?[{text:t.text,cat:t.cat,d:t.doneDate||t.date}]:[]).sort((a,b)=>a.d.localeCompare(b.d));
+const WD=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+let tab='today',nc='lesson',recv=0,sel=T0(),cm=new Date();cm=new Date(cm.getFullYear(),cm.getMonth(),1);
+let nd=T0(),ntv='',mo=false,mm=new Date();
+
+const head=(title,sub)=>`<header class="flex items-start gap-3 pt-2"><div class="flex-1 min-w-0"><h1 class="text-[32px] font-black tracking-tight leading-tight">${title}</h1><p class="text-[15px] font-bold text-neutral-500 leading-snug mt-1">${sub}</p></div><button onclick="settings()" class="card tap w-12 h-12 flex items-center justify-center flex-none mt-1" aria-label="Настройки">${img('smiski_tighteningbolt.png','w-8 h-8')}</button></header>`;
+const row=(t,d)=>`<div class="task tap ${isDone(t,d)?'done':''} card flex items-center gap-3.5 px-4 py-3.5" onclick="tog(${t.id},this,'${d}')"><div class="chk"></div><div class="flex-1 min-w-0"><div class="truncate font-extrabold text-[17px]"><span class="t">${esc(t.text)}</span></div><div class="flex flex-wrap items-center gap-1.5 mt-1">${tag(t.cat)}${t.rec?`<span class="tag" style="background:#E9E9E7;color:#32302C">🔁 ${rule(t.date)}</span>`:''}${t.time?`<span class="text-xs text-neutral-400 font-bold">${t.time}</span>`:''}</div></div><button onclick="event.stopPropagation();del(${t.id})" class="w-10 h-10 rounded-full flex items-center justify-center flex-none text-neutral-400 active:bg-red-50 active:text-red-500 transition" aria-label="Удалить">${TRASH}</button></div>`;
+const empty=(title,text,src)=>`<div class="card relative ${src?'mt-28':'mt-6'} p-5 text-center pop">${src?sit(src,'w-40 h-32','left-1/2 -translate-x-1/2'):''}<h3 class="font-black text-lg">${title}</h3><p class="text-sm text-neutral-500 font-bold mt-1">${text}</p></div>`;
+const h2=t=>`<h2 class="text-sm font-extrabold text-neutral-500 px-1 mt-6 mb-2">${t}</h2>`;
+
+const V={
+today(){
+  const d0=T0(),ts=on(d0).sort(byTime),d=ts.filter(t=>isDone(t,d0)).length,p=ts.length?Math.round(d/ts.length*100):0;
+  const dl=S.tasks.filter(t=>!t.rec&&!t.done&&t.date>=d0&&['submit','exam'].includes(t.cat)).sort((a,b)=>a.date.localeCompare(b.date))[0];
+  return head('Сегодня 🌿',G0)+
+  `<div class="card relative mt-28 p-4">${sit('smiski_studying.png','w-32 h-32')}<div class="flex justify-between text-sm font-extrabold mb-2.5"><span id="pstat">${status(d,ts.length)}</span><span id="plabel" class="text-neutral-400">${d} из ${ts.length}</span></div><div class="track h-4 rounded-full overflow-hidden"><div id="pbar" class="h-full rounded-full bg-[#A8C3A0]" style="width:${p}%;transition:width .6s cubic-bezier(.2,.8,.2,1)"></div></div></div>`+
+  (dl?`<div class="card relative mt-24 p-4">${sit('smiski_pointer.png','w-24 h-24')}<div class="text-xs font-extrabold text-neutral-400">Ближайший дедлайн 📌</div><div class="font-extrabold truncate pr-24">${esc(dl.text)}</div><div class="text-sm font-bold text-neutral-500">${cap(new Date(dl.date+'T00:00').toLocaleDateString('ru',{weekday:'short',day:'numeric',month:'long'}))}${dl.time?', '+dl.time:''}</div></div>`:'')+
+  (ts.length?h2('Твои дела')+`<div class="space-y-3">${ts.map(t=>row(t,d0)).join('')}</div>`:empty('На сегодня пусто','можно отдохнуть, а можно добавить дело кнопкой +','smiski_laydown.jpg'))+
+  (ts.length&&d===ts.length?`<div class="card relative mt-28 p-4 pop" style="background:#f3f7f1">${sit('smiski_gituar.png','w-28 h-28')}<div class="font-extrabold">Все сделано 🎸</div><div class="text-sm text-neutral-500 font-bold">все сделано, можно выдыхать</div></div>`:'');
+},
+plans(){
+  const y=cm.getFullYear(),m=cm.getMonth(),off=(cm.getDay()+6)%7,dim=new Date(y,m+1,0).getDate();
+  let cells='<div></div>'.repeat(off);
+  for(let n=1;n<=dim;n++){const k=iso(new Date(y,m,n)),cl=[...new Set(on(k).map(t=>CATS[t.cat][2]))].slice(0,3);
+    cells+=`<button onclick="pickDay('${k}')" class="h-12 flex flex-col items-center justify-center gap-0.5"><span class="w-8 h-8 rounded-full grid place-items-center text-[15px] font-extrabold ${k===sel?'bg-[#A8C3A0] text-[#1f3a1c] shadow-[0_3px_0_#8aa883]':k===T0()?'bg-[#e3eee0] text-[#2f4a2b]':''}">${n}</span><span class="flex gap-0.5 h-1.5">${cl.map(c=>`<i class="w-1.5 h-1.5 rounded-full" style="background:${c}"></i>`).join('')}</span></button>`}
+  const ts=on(sel).sort(byTime);
+  return head('Все планы 🗓','весь месяц как на ладони, жми на день')+
+  `<div class="card relative mt-28 p-3">${sit('smiski_balancingboxes.png','w-28 h-28')}<div class="flex items-center justify-between mb-1"><button onclick="mon(-1)" class="w-9 h-9 text-2xl text-[#6b8d63]" aria-label="Прошлый месяц">‹</button><b class="font-black text-lg">${cap(cm.toLocaleDateString('ru',{month:'long',year:'numeric'}))}</b><button onclick="mon(1)" class="w-9 h-9 text-2xl text-[#6b8d63]" aria-label="Следующий месяц">›</button></div><div class="grid grid-cols-7 text-center text-[11px] font-extrabold text-neutral-400 mb-1">${WD.map(x=>`<div>${x}</div>`).join('')}</div><div class="grid grid-cols-7">${cells}</div></div>`+
+  h2(cap(new Date(sel+'T00:00').toLocaleDateString('ru',{weekday:'long',day:'numeric',month:'long'})))+
+  (ts.length?`<div class="space-y-3">${ts.map(t=>row(t,sel)).join('')}</div>`:empty('Свободный день','тут пусто. нажми +, если что-то надумаешь','smiski_airplane.png'));
+},
+lists(){
+  return head('Чек-листы ✅','покупки, сборы, рутины. все по пунктам')+
+  `<div class="card relative mt-28 p-3 flex gap-2">${sit('smiski_yoga%20pose.png','w-28 h-28')}<input id="ln" class="inp" placeholder="Название чек-листа" onkeydown="if(event.key==='Enter')addList()"><button onclick="addList()" class="btn px-4 whitespace-nowrap">Создать</button></div>`+
+  (S.lists.length?S.lists.map(L=>`<div class="card p-4 mt-4"><div class="flex items-center gap-2 mb-1"><b class="flex-1 truncate font-black text-[17px]">${esc(L.title)}</b><span class="text-xs font-extrabold text-neutral-400">${L.items.filter(i=>i.done).length} из ${L.items.length}</span><button onclick="delList(${L.id})" class="w-10 h-10 -my-1 rounded-full flex items-center justify-center flex-none text-neutral-400 active:bg-red-50 active:text-red-500 transition" aria-label="Удалить чек-лист">${TRASH}</button></div>${L.items.map(i=>`<div class="task ${i.done?'done':''} flex items-center gap-3 py-2" onclick="togItem(${L.id},${i.id},this)"><div class="chk"></div><span class="flex-1 min-w-0 truncate font-bold"><span class="t">${esc(i.text)}</span></span><button onclick="event.stopPropagation();delItem(${L.id},${i.id})" class="w-9 h-9 rounded-full flex items-center justify-center flex-none text-neutral-400 active:bg-red-50 active:text-red-500 transition" aria-label="Удалить пункт">${TRASH}</button></div>`).join('')}<div class="flex gap-2 mt-2"><input id="li${L.id}" class="inp !py-2" placeholder="Новый пункт" onkeydown="if(event.key==='Enter')addItem(${L.id})"><button onclick="addItem(${L.id})" class="btn px-4 text-xl" aria-label="Добавить пункт">+</button></div></div>`).join(''):empty('Чек-листов пока нет','создай первый, например «купить в магазине»'));
+},
+links(){
+  return head('Ссылки 🔗','кидай сюда, я сохраню, не потеряется')+
+  (S.links.length?`<div class="space-y-3 mt-6">${S.links.map(l=>`<div class="lk card tap flex items-center gap-3 pl-5 pr-2 py-2.5" onclick="openLink(${l.id})"><div class="flex-1 min-w-0"><div class="font-extrabold truncate">${esc(l.title)}</div><div class="text-xs text-neutral-400 font-bold truncate">${esc(l.url)}</div></div><button onclick="event.stopPropagation();delLink(${l.id},this)" class="w-10 h-10 rounded-full flex items-center justify-center text-neutral-400 active:bg-red-50 active:text-red-500 transition" aria-label="Удалить ссылку">${TRASH}</button></div>`).join('')}</div>`:empty('Пока ничего нет','сохраняй статьи, видео и всякое полезное'))+
+  `<div class="h-32"></div><div class="fixed inset-x-3 max-w-md mx-auto z-10" style="bottom:calc(88px + env(safe-area-inset-bottom))"><div class="card relative !rounded-[24px] p-2 flex gap-2 items-center">${sit('smiski_paperairplane.png','w-24 h-24','right-3')}<input id="lt" class="inp !py-2 !px-3 text-sm !w-[34%]" placeholder="Название"><input id="lu" class="inp !py-2 !px-3 text-sm flex-1" placeholder="URL" inputmode="url" onkeydown="if(event.key==='Enter')addLink()"><button onclick="addLink()" class="btn w-10 h-10 text-2xl leading-none flex-none" aria-label="Сохранить ссылку">+</button></div></div>`;
+},
+stats(){
+  const dn=doneList(),st=streak(new Set(dn.map(x=>x.d))),u=tg?.initDataUnsafe?.user,by=Object.keys(CATS).map(k=>[k,dn.filter(t=>t.cat===k).length]),mx=Math.max(1,...by.map(b=>b[1]));
+  const act=S.tasks.filter(t=>!t.rec&&!t.done).length;
+  const tile=(n,l)=>`<div><div class="text-3xl font-black">${n}</div><div class="text-xs font-extrabold text-neutral-400">${l}</div></div>`;
+  return head('Итоги 🏆','ну что, посмотрим, как ты справляешься')+
+  `<div class="card relative mt-28 p-4">${sit('smiski_sweater.png','w-28 h-28')}<div class="font-black text-lg">${esc(u?.first_name||'Друг')}</div><div class="text-sm text-neutral-500 font-bold">${u?.username?'@'+esc(u.username):'я рядом, шаг за шагом'}</div></div>
+  <div class="card relative mt-28 p-5 grid grid-cols-3 text-center">${sit('smiski_skateboard.png','w-28 h-28')}${tile(st,cap(pl(st,['день','дня','дней']))+' подряд')}${tile(dn.length,'Сделано')}${tile(act,'В работе')}</div>
+  <div class="card relative mt-28 p-4">${sit('smiski_teamwork.png','w-28 h-28')}<div class="font-black mb-3">По категориям</div><div class="space-y-2.5">${by.map(([k,n])=>`<div class="flex items-center gap-2"><span class="w-28 flex-none">${tag(k)}</span><div class="track flex-1 h-2.5 rounded-full"><div class="h-full rounded-full" style="width:${n/mx*100}%;background:${CATS[k][2]};opacity:.5;transition:width .5s"></div></div><span class="w-5 text-right text-sm font-extrabold">${n}</span></div>`).join('')}</div></div>
+  <div class="card relative mt-28 p-4">${sit('smiski_withbox.png','w-28 h-28')}<div class="font-black mb-1">Архив 📦</div>${dn.length?dn.slice(-5).reverse().map(t=>`<div class="text-sm font-bold text-neutral-400 py-1 truncate line-through">${esc(t.text)}</div>`).join(''):'<p class="text-sm text-neutral-500 font-bold">сделанные дела появятся здесь... скоро</p>'}</div>`;
+}
+};
+
+function render(){
+  $('#app').innerHTML=V[tab]();
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===tab));
+  $('#fab').style.display=['today','plans'].includes(tab)?'block':'none';
+}
+function go(t){tab=t;render();scrollTo(0,0);hap()}
+$('#nav').innerHTML=NAV.map(([k,e,l])=>`<button data-t="${k}" onclick="go('${k}')" class="flex-1 rounded-2xl py-2 flex flex-col items-center text-[10.5px] font-extrabold">${ic(e,22)}<span class="mt-1">${l}</span></button>`).join('');
+function pickDay(k){sel=k;hap();render()}
+function mon(n){cm=new Date(cm.getFullYear(),cm.getMonth()+n,1);render()}
+
+function prog(){const d0=T0(),ts=on(d0),d=ts.filter(t=>isDone(t,d0)).length;$('#pbar').style.width=(ts.length?d/ts.length*100:0)+'%';$('#plabel').textContent=d+' из '+ts.length;$('#pstat').textContent=status(d,ts.length)}
+function tog(id,el,d){
+  const t=S.tasks.find(x=>x.id===id);
+  if(t.rec){t.log=t.log||{};t.log[d]?delete t.log[d]:t.log[d]=1}else{t.done=!t.done;t.doneDate=t.done?T0():null}
+  save();hap();el.classList.toggle('done',isDone(t,d));
+  if(tab==='today')prog();
+  setTimeout(render,550);
+}
+let _cb=null;
+function ask(title,sub,btn,fn){_cb=fn;openSheet(`<div class="pt-2 text-center"><h2 class="text-xl font-black">${title}</h2><p class="text-sm text-neutral-500 font-bold mt-1 mb-5">${sub}</p><button onclick="const f=_cb;closeSheet();f&&f()" class="w-full py-3.5 rounded-[18px] font-extrabold bg-red-50 text-red-500 mb-3">${btn}</button><button onclick="closeSheet()" class="btn w-full py-3.5">Оставить</button></div>`)}
+function del(id){
+  const t=S.tasks.find(x=>x.id===id);if(!t)return;
+  const go=()=>{S.tasks=S.tasks.filter(x=>x.id!==id);save();render()};
+  t.rec?ask('Удалить постоянную задачу?','она пропадет изо всех недель вместе с отметками. вернуть не получится','Удалить',go):go();
+}
+
+function openSheet(h){$('#sheet-in').innerHTML=h;$('#ov').classList.add('open')}
+function closeSheet(){$('#ov').classList.remove('open')}
+const banner=(src,t,s)=>`<div class="relative mt-20 mb-4 rounded-[24px] bg-[#e3eee0] px-4 py-4 shadow-[0_4px_0_#c5d9c0]">${sit(src,'w-28 h-28')}<h2 class="text-2xl font-black tracking-tight">${t}</h2><p class="text-sm text-[#52704c] font-bold">${s}</p></div>`;
+
+const chips=()=>Object.entries(CATS).map(([k,[l,bg,fg]])=>`<button type="button" tabindex="-1" onmousedown="event.preventDefault()" class="chip ${k===nc?'on':''}" style="background:${bg};color:${fg};--c:${fg}" onclick="pick('${k}')">${l}</button>`).join('');
+const seg=()=>`<div class="flex items-center justify-between mt-4 gap-3"><div><div class="font-extrabold">Постоянная задача?</div><div class="text-xs text-neutral-500 font-bold">будет повторяться: ${rule(nd).toLowerCase()}</div></div><div class="flex track rounded-full p-1 flex-none">${[['Нет',0],['Да',1]].map(([l,v])=>`<button type="button" tabindex="-1" onmousedown="event.preventDefault()" onclick="setRec(${v})" class="px-4 py-1.5 rounded-full text-sm font-extrabold transition ${recv===v?(v?'bg-[#A8C3A0] text-[#1f3a1c] shadow-[0_3px_0_#8aa883]':'bg-white shadow text-[#2b2b2b]'):'text-neutral-500'}">${l}</button>`).join('')}</div></div>`;
+const dlabel=()=>cap(new Date(nd+'T00:00').toLocaleDateString('ru',{weekday:'short',day:'numeric',month:'long'}));
+const mcal=()=>{const y=mm.getFullYear(),m=mm.getMonth(),off=(new Date(y,m,1).getDay()+6)%7,dim=new Date(y,m+1,0).getDate();let c='<i></i>'.repeat(off);
+  for(let n=1;n<=dim;n++){const k=iso(new Date(y,m,n));c+=`<button type="button" tabindex="-1" onmousedown="event.preventDefault()" onclick="pickD('${k}')" class="mx-auto w-9 h-9 rounded-full text-sm font-extrabold transition ${k===nd?'bg-[#A8C3A0] text-[#1f3a1c] shadow-[0_3px_0_#8aa883]':k===T0()?'bg-[#e3eee0] text-[#2f4a2b]':''}">${n}</button>`}
+  return `<div class="mt-3 rounded-[24px] bg-[#f1f6ee] p-3 pop"><div class="flex items-center justify-between mb-2"><button type="button" onclick="mmon(-1)" class="w-9 h-9 text-2xl text-[#6b8d63]" aria-label="Прошлый месяц">‹</button><b class="font-black">${cap(mm.toLocaleDateString('ru',{month:'long',year:'numeric'}))}</b><button type="button" onclick="mmon(1)" class="w-9 h-9 text-2xl text-[#6b8d63]" aria-label="Следующий месяц">›</button></div><div class="grid grid-cols-7 text-center text-[11px] font-extrabold text-[#8aa883] mb-1">${WD.map(x=>`<div>${x}</div>`).join('')}</div><div class="grid grid-cols-7 gap-y-1">${c}</div></div>`};
+const dateRow=()=>`<div class="flex gap-2"><button type="button" tabindex="-1" onmousedown="event.preventDefault()" onclick="togCal()" class="flex-1 flex items-center justify-between rounded-2xl px-4 py-3 font-extrabold bg-[#e3eee0] text-[#2f4a2b] shadow-[0_4px_0_#c5d9c0] active:translate-y-[3px] active:shadow-none transition"><span>📅 ${dlabel()}</span><span class="text-sm">${mo?'▲':'▼'}</span></button><input type="time" value="${ntv}" oninput="ntv=this.value" class="inp !w-28 text-center"></div>${mo?mcal():''}`;
+const rd=()=>{$('#drow').innerHTML=dateRow()};
+function togCal(){mo=!mo;mm=new Date(+nd.slice(0,4),+nd.slice(5,7)-1,1);rd();hap()}
+function mmon(n){mm=new Date(mm.getFullYear(),mm.getMonth()+n,1);rd()}
+function pickD(k){nd=k;mo=false;rd();$('#seg').innerHTML=seg();hap()}
+
+function addSheet(){
+  nc='lesson';recv=0;nd=tab==='plans'?sel:T0();ntv='';mo=false;
+  openSheet(banner('smiski_idea.png','Новая задача ✨','говори, что надо сделать, я запишу')+
+  `<input id="nt" class="inp" placeholder="Что нужно сделать?" autocomplete="off">
+  <div id="chips" class="flex flex-wrap gap-2 my-4">${chips()}</div>
+  <div id="drow">${dateRow()}</div>
+  <div id="seg">${seg()}</div>
+  <button onclick="saveTask()" class="btn w-full py-4 mt-5 text-lg">Добавить</button>`);
+  setTimeout(()=>$('#nt').focus(),350);
+}
+function pick(k){nc=k;$('#chips').innerHTML=chips();document.activeElement?.blur?.();hap()}
+function setRec(v){recv=v;$('#seg').innerHTML=seg();hap()}
+function saveTask(){
+  const text=$('#nt').value.trim();if(!text){$('#nt').focus();return}
+  S.tasks.push({id:Date.now(),text,cat:nc,date:nd||T0(),time:ntv,done:false,doneDate:null,rec:!!recv,log:{}});
+  save();closeSheet();render();hap();
+}
+
+function addList(){const v=$('#ln').value.trim();if(!v)return;S.lists.unshift({id:Date.now(),title:v,items:[]});save();render()}
+function delList(id){ask('Удалить чек-лист?','вместе со всеми пунктами','Удалить',()=>{S.lists=S.lists.filter(l=>l.id!==id);save();render()})}
+function addItem(id){const v=$('#li'+id).value.trim();if(!v)return;S.lists.find(l=>l.id===id).items.push({id:Date.now(),text:v,done:false});save();render();$('#li'+id)?.focus()}
+function togItem(lid,id,el){const it=S.lists.find(l=>l.id===lid).items.find(i=>i.id===id);it.done=!it.done;save();hap();el.classList.toggle('done',it.done);setTimeout(render,450)}
+function delItem(lid,id){const L=S.lists.find(l=>l.id===lid);L.items=L.items.filter(i=>i.id!==id);save();render()}
+
+function addLink(){
+  let u=$('#lu').value.trim();if(!u)return;if(!/^https?:\/\//i.test(u))u='https://'+u;
+  let title=$('#lt').value.trim();try{title=title||new URL(u).hostname}catch(e){title=title||u}
+  S.links.unshift({id:Date.now(),url:u,title});save();render();hap();
+}
+function delLink(id,el){
+  el.closest('.lk').style.cssText+=';transition:.25s;opacity:0;transform:translateX(24px)';hap();
+  setTimeout(()=>{S.links=S.links.filter(l=>l.id!==id);save();render()},250);
+}
+function openLink(id){const l=S.links.find(x=>x.id===id);if(!l)return;tg?.openLink?tg.openLink(l.url):window.open(l.url,'_blank')}
+
+function settings(){
+  openSheet(banner('smiski_tighteningbolt.png','Настройки ⚙️','тут можно прибраться, если накопилось')+
+  `<button onclick="clearDone()" class="btn w-full py-3.5 mb-3">Удалить сделанные</button>
+  <button onclick="resetAll()" class="w-full py-3.5 rounded-[18px] font-extrabold bg-red-50 text-red-500">Сбросить все данные</button>`);
+}
+function clearDone(){S.tasks=S.tasks.filter(t=>t.rec||!t.done);S.lists.forEach(l=>l.items=l.items.filter(i=>!i.done));save();closeSheet();render()}
+function resetAll(){ask('Сбросить все данные?','задачи, чек-листы и ссылки пропадут насовсем','Сбросить',()=>{S={tasks:[],links:[],lists:[]};save();render()})}
+
+render();
+</script>
+</body>
+</html>
